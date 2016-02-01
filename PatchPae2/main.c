@@ -345,6 +345,92 @@ VOID PatchKernel9600(
     }
 }
 
+VOID PatchKernel10586(
+    __in PLOADED_IMAGE LoadedImage,
+    __out PBOOLEAN Success
+    )
+{
+    // MxMemoryLicense
+
+    // Basically, the portion of code we are going to patch 
+    // queries the NT license value for the allowed memory.
+    // If there is a limit, it sets MiTotalPagesAllowed to 
+    // that limit times 256. If there is no specified limit, 
+    // it sets MiTotalPagesAllowed to 0x80000 (2 GB).
+    //
+    // We will patch the limit to be 0x20000 << 8 pages (128 GB).
+
+    UCHAR target[] =
+    {
+        // test eax, eax ; did NtQueryLicenseValue succeed?
+        0x85, 0xc0,
+        // js short loc_96184f ; if it didn't go to the default case
+        0x78, 0x46,
+        // mov esi, [ebp+Address] ; get the returned memory limit
+        0x8b, 0x75, 0xfc,
+        // test esi, esi ; is it non-zero?
+        0x85, 0xf6,
+        // jz short loc_96184f ; if it's zero, go to the default case
+        0x74, 0x3f,
+        // shl esi, 8 ; multiply by 256
+        0xc1, 0xe6, 0x08
+        // ...
+    };
+    ULONG movOffset = 4;
+    PUCHAR ptr = LoadedImage->MappedAddress;
+    ULONG i, j, k;
+
+    for (i = 0; i < LoadedImage->SizeOfImage - sizeof(target); i++)
+    {
+        for (j = 0; j < sizeof(target); j++)
+        {
+            if (ptr[j] != target[j] && j != 3 && j != 10) // ignore jump offsets
+                break;
+        }
+
+        if (j == sizeof(target))
+        {
+            // Found it. Patch the code.
+
+            // mov esi, [ebp+Address] -> mov esi, 0x20000
+            ptr[movOffset] = 0xbe;
+            *(PULONG)&ptr[movOffset + 1] = 0x20000;
+            // nop out the jz
+            ptr[movOffset + 5] = 0x90;
+            ptr[movOffset + 6] = 0x90;
+
+            // Do the same thing to the next mov ecx, [ebp+Address] 
+            // occurence.
+            for (k = 0; k < 100; k++)
+            {
+                if (
+                    ptr[k] == 0x8b &&
+                    ptr[k + 1] == 0x4d &&
+                    ptr[k + 2] == 0xfc &&
+                    ptr[k + 3] == 0x85 &&
+                    ptr[k + 4] == 0xc9
+                    )
+                {
+                    // mov ecx, [ebp+Address] -> mov ecx, 0x20000
+                    ptr[k] = 0xb9;
+                    *(PULONG)&ptr[k + 1] = 0x20000;
+                    // nop out the jz
+                    ptr[k + 5] = 0x90;
+                    ptr[k + 6] = 0x90;
+
+                    *Success = TRUE;
+
+                    break;
+                }
+            }
+
+            break;
+        }
+
+        ptr++;
+    }
+}
+
 VOID PatchLoader(
     __in PLOADED_IMAGE LoadedImage,
     __out PBOOLEAN Success
@@ -837,6 +923,168 @@ VOID PatchLoader9600(
     *Success = success1 && success2;
 }
 
+VOID PatchLoader10586Part1(
+    __in PLOADED_IMAGE LoadedImage,
+    __out PBOOLEAN Success
+    )
+{
+    // ImgpLoadPEImage
+
+    UCHAR target[] =
+    {
+        // push eax
+        0x50,
+        // push [ebp+var_90]
+        0xff, 0xb5, 0x70, 0xff, 0xff, 0xff,
+        // lea eax, [ebp+var_180]
+        0x8d, 0x85, 0x80, 0xfe, 0xff, 0xff,
+        // push [ebp+var_10]
+        0xff, 0x75, 0xf0,
+        // push eax
+        0x50,
+        // push ecx
+        0x51,
+        // lea eax, [ebp+var_bc]
+        0x8d, 0x85, 0x44, 0xff, 0xff, 0xff,
+        // push eax
+        0x50,
+        // mov eax, [ebp+var_30]
+        0x8b, 0x45, 0xd0,
+        // push esi
+        0x56,
+        // mov ecx, [eax+0ch]
+        0x8b, 0x48, 0x0c,
+        // call _ImgpValidateImageHash@44
+        // 0xe8, 0x7a, 0x0d, 0x00, 0x00
+        // mov ebx, eax
+        // 0x8b, 0xd8
+        // test ebx, ebx ; did ImgpValidateImageHash succeed?
+        // 0x85, 0xdb
+        // js short loc_438a9d ; if the function did not succeed, go there
+        // 0x0f, 0x88, 0x9f, 0x00, 0x00, 0x00
+    };
+    ULONG jnsOffset = 41;
+    PUCHAR ptr = LoadedImage->MappedAddress;
+    ULONG i, j;
+
+    for (i = 0; i < LoadedImage->SizeOfImage - sizeof(target); i++)
+    {
+        for (j = 0; j < sizeof(target); j++)
+        {
+            if (ptr[j] != target[j])
+                break;
+        }
+
+        if (j == sizeof(target))
+        {
+            // Found it. Patch the code.
+            // Note that eax and ebx are not used later, so we can ignore them.
+
+            // js short loc_438a9d -> nop; nop; nop; nop; nop; nop
+            // 0x0f, 0x88, 0x9f, 0x00, 0x00, 0x00 -> 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
+            ptr[jnsOffset] = 0x90;
+            ptr[jnsOffset + 1] = 0x90;
+            ptr[jnsOffset + 2] = 0x90;
+            ptr[jnsOffset + 3] = 0x90;
+            ptr[jnsOffset + 4] = 0x90;
+            ptr[jnsOffset + 5] = 0x90;
+
+            *Success = TRUE;
+
+            break;
+        }
+
+        ptr++;
+    }
+}
+
+VOID PatchLoader10586Part2(
+    __in PLOADED_IMAGE LoadedImage,
+    __out PBOOLEAN Success
+    )
+{
+    // BlImgLoadImageWithProgress2
+
+    UCHAR target[] =
+    {
+        // push ecx
+        0x51,
+        // push ecx
+        0x51,
+        // push ecx
+        0x51,
+        // push [ebp+var_34]
+        0xff, 0x75, 0xcc,
+        // push [ebp+var_28]
+        0xff, 0x75, 0xd8,
+        // push eax
+        0x50,
+        // push [ebp+var_16c]
+        0xff, 0xb5, 0x94, 0xfe, 0xff, 0xff,
+        // push ecx
+        0x51,
+        // push [ebp+var_c]
+        0xff, 0x75, 0xf4,
+        // mov ecx, [ebp+arg_0]
+        0x8b, 0x4d, 0x08,
+        // call _ImgpValidateImageHash@44
+        // 0xe8, 0x5c, 0x1e, 0x00, 0x00
+        // mov esi, eax
+        // 0x8b, 0xf0
+        // test esi, esi ; did ImgpValidateImageHash succeed?
+        // 0x85, 0xf6
+        // jns short loc_43796a ; if the function succeeded, go there
+        // 0x79, 0x52
+    };
+    ULONG movOffset = 28;
+    PUCHAR ptr = LoadedImage->MappedAddress;
+    ULONG i, j;
+
+    for (i = 0; i < LoadedImage->SizeOfImage - sizeof(target); i++)
+    {
+        for (j = 0; j < sizeof(target); j++)
+        {
+            if (ptr[j] != target[j])
+                break;
+        }
+
+        if (j == sizeof(target))
+        {
+            // Found it. Patch the code.
+
+            // mov esi, eax -> xor esi, esi
+            // 0x8b, 0xf0 -> 0x33, 0xf6
+            ptr[movOffset] = 0x33;
+            ptr[movOffset + 1] = 0xf6;
+
+            *Success = TRUE;
+
+            break;
+        }
+
+        ptr++;
+    }
+}
+
+VOID PatchLoader10586(
+    __in PLOADED_IMAGE LoadedImage,
+    __out PBOOLEAN Success
+    )
+{
+    // ImgpLoadPEImage and BlImgLoadImageWithProgressEx
+
+    // There is a function called ImgpValidateImageHash. We are 
+    // going to patch ImgpLoadPEImage and BlImgLoadImageWithProgressEx
+    // so that they don't care what the result of the function is.
+
+    BOOLEAN success1 = FALSE;
+    BOOLEAN success2 = FALSE;
+
+    PatchLoader10586Part1(LoadedImage, &success1);
+    PatchLoader10586Part2(LoadedImage, &success2);
+    *Success = success1 && success2;
+}
+
 BOOLEAN CommandLineCallback(
     __in_opt PPH_COMMAND_LINE_OPTION Option,
     __in_opt PPH_STRING Value,
@@ -912,8 +1160,10 @@ int __cdecl main(int argc, char *argv[])
             Patch(ArgOutput, PatchKernel9200);
         else if (buildNumber == 9600)
             Patch(ArgOutput, PatchKernel9600);
+        else if (buildNumber == 10586)
+            Patch(ArgOutput, PatchKernel10586);
         else
-            Fail(L"Unsupported kernel version.", 0);
+            Fail(PhFormatString(L"Unsupported kernel version: %u", buildNumber)->Buffer, 0);
     }
     else
     {
@@ -927,8 +1177,10 @@ int __cdecl main(int argc, char *argv[])
             Patch(ArgOutput, PatchLoader9200);
         else if (buildNumber == 9600)
             Patch(ArgOutput, PatchLoader9600);
+        else if (buildNumber == 10586)
+            Patch(ArgOutput, PatchLoader10586);
         else
-            Fail(L"Unsupported loader version.", 0);
+            Fail(PhFormatString(L"Unsupported loader version: %u", buildNumber)->Buffer, 0);
     }
 
     return 0;

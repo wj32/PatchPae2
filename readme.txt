@@ -1,5 +1,5 @@
 PatchPae (v2) by wj32.
-Tested on: Windows Vista SP2, Windows 7 SP0, Windows 7 SP1, Windows 8, Windows 8.1
+Tested on: Windows Vista SP2, Windows 7 SP0, Windows 7 SP1, Windows 8, Windows 8.1, Windows 10 (build 10586)
 
 == Installation ==
 1.  Open an elevated Command Prompt window.
@@ -7,7 +7,7 @@ Tested on: Windows Vista SP2, Windows 7 SP0, Windows 7 SP1, Windows 8, Windows 8
 2.  cd C:\Windows\system32.
     Make sure the current directory is in fact system32.
 
-[[ For Windows 8 and Windows 8.1: ]]
+[[ For Windows 8, Windows 8.1 and Windows 10: ]]
 3.  C:\WherePatchPaeIs\PatchPae2.exe -type kernel -o ntoskrnx.exe ntoskrnl.exe
     This will patch the kernel to enable a maximum of 128GB of RAM.
 [[ For Windows Vista and Windows 7: ]]
@@ -21,7 +21,7 @@ Tested on: Windows Vista SP2, Windows 7 SP0, Windows 7 SP1, Windows 8, Windows 8
     This will create a new boot entry. A message should appear:
     The entry was successfully copied to {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}.
 
-[[ For Windows 8 and Windows 8.1: ]]
+[[ For Windows 8, Windows 8.1 and Windows 10: ]]
 6.  bcdedit /set {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} kernel ntoskrnx.exe
     This will set our boot entry to load our patched kernel.
 [[ For Windows Vista and Windows 7: ]]
@@ -53,7 +53,7 @@ When Windows Update installs new updates on your computer, you should run Step 3
 that you have the latest version of the kernel.
 
 == Compiling ==
-To compile PatchPae2, you need to get Process Hacker from processhacker.sourceforge.net and build it.
+To compile PatchPae2, you need to get Process Hacker and build it.
 The directory structure should look like this:
  * ...\ProcessHacker2\lib\...
  * ...\ProcessHacker2\phlib\...
