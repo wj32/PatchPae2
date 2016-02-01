@@ -59,12 +59,12 @@ VOID Patch(
     )
 {
     BOOLEAN success;
-    PPH_ANSI_STRING ansiFileName;
+    PPH_BYTES mbFileName;
     LOADED_IMAGE loadedImage;
 
-    ansiFileName = PhCreateAnsiStringFromUnicodeEx(FileName->Buffer, FileName->Length);
+    mbFileName = PhConvertUtf16ToMultiByteEx(FileName->Buffer, FileName->Length);
 
-    if (!MapAndLoad(ansiFileName->Buffer, NULL, &loadedImage, FALSE, FALSE))
+    if (!MapAndLoad(mbFileName->Buffer, NULL, &loadedImage, FALSE, FALSE))
         Fail(L"Unable to map and load image", GetLastError());
 
     success = FALSE;
@@ -72,7 +72,7 @@ VOID Patch(
     // This will unload the image and fix the checksum.
     UnMapAndLoad(&loadedImage);
 
-    PhDereferenceObject(ansiFileName);
+    PhDereferenceObject(mbFileName);
 
     if (success)
         wprintf(L"Patched.\n");
