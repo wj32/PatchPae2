@@ -51,14 +51,15 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>../../ProcessHacker2/phlib/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../ProcessHacker2/phnt/include;../../ProcessHacker2/phlib/include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <CallingConvention>StdCall</CallingConvention>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+      <PreprocessorDefinitions>_PHLIB_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>../../ProcessHacker2/phlib/bin/$(Configuration)$(PlatformArchitecture);../../ProcessHacker2/lib/lib32</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>../../ProcessHacker2/phlib/bin/$(Configuration)$(PlatformArchitecture)</AdditionalLibraryDirectories>
       <AdditionalDependencies>imagehlp.lib;ntdll.lib;phlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -68,16 +69,17 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>../../ProcessHacker2/phlib/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../../ProcessHacker2/phnt/include;../../ProcessHacker2/phlib/include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <CallingConvention>StdCall</CallingConvention>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+      <PreprocessorDefinitions>_PHLIB_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>../../ProcessHacker2/phlib/bin/$(Configuration)$(PlatformArchitecture);../../ProcessHacker2/lib/lib32</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>../../ProcessHacker2/phlib/bin/$(Configuration)$(PlatformArchitecture)</AdditionalLibraryDirectories>
       <AdditionalDependencies>imagehlp.lib;ntdll.lib;phlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
