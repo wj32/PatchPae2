@@ -932,10 +932,6 @@ VOID PatchLoader10586Part1(
 
     UCHAR target[] =
     {
-        // push eax
-        0x50,
-        // push [ebp+var_90]
-        0xff, 0xb5, 0x70, 0xff, 0xff, 0xff,
         // lea eax, [ebp+var_180]
         0x8d, 0x85, 0x80, 0xfe, 0xff, 0xff,
         // push [ebp+var_10]
@@ -963,7 +959,13 @@ VOID PatchLoader10586Part1(
         // js short loc_438a9d ; if the function did not succeed, go there
         // 0x0f, 0x88, 0x9f, 0x00, 0x00, 0x00
     };
-    ULONG jnsOffset = 41;
+
+	BOOL wildcardOffsets[sizeof(target)] = { 0 };
+	wildcardOffsets[2] = TRUE;
+	wildcardOffsets[13] = TRUE;
+	wildcardOffsets[20] = TRUE;
+
+    ULONG jnsOffset = 34;
     PUCHAR ptr = LoadedImage->MappedAddress;
     ULONG i, j;
 
@@ -971,7 +973,7 @@ VOID PatchLoader10586Part1(
     {
         for (j = 0; j < sizeof(target); j++)
         {
-            if (ptr[j] != target[j])
+            if ((ptr[j] != target[j]) && !wildcardOffsets[j])
                 break;
         }
 
@@ -1036,6 +1038,7 @@ VOID PatchLoader10586Part2(
         // jns short loc_43796a ; if the function succeeded, go there
         // 0x79, 0x52
     };
+    ULONG wildcardOffset = 8;
     ULONG movOffset = 28;
     PUCHAR ptr = LoadedImage->MappedAddress;
     ULONG i, j;
@@ -1044,7 +1047,7 @@ VOID PatchLoader10586Part2(
     {
         for (j = 0; j < sizeof(target); j++)
         {
-            if (ptr[j] != target[j])
+            if ((ptr[j] != target[j]) && j != wildcardOffset)
                 break;
         }
 
@@ -1177,7 +1180,7 @@ int __cdecl main(int argc, char *argv[])
             Patch(ArgOutput, PatchLoader9200);
         else if (buildNumber == 9600)
             Patch(ArgOutput, PatchLoader9600);
-        else if (buildNumber == 10586)
+        else if (buildNumber >= 10240)
             Patch(ArgOutput, PatchLoader10586);
         else
             Fail(PhFormatString(L"Unsupported loader version: %u", buildNumber)->Buffer, 0);
