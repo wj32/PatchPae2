@@ -53,6 +53,28 @@ ULONG GetBuildNumber(
     return buildNumber;
 }
 
+ULONG GetRevisionNumber(
+    __in PWSTR FileName
+    )
+{
+    ULONG revisionNumber = 0;
+    PVOID versionInfo;
+    VS_FIXEDFILEINFO *rootBlock;
+    ULONG rootBlockLength;
+
+    versionInfo = PhGetFileVersionInfo(FileName);
+
+    if (!versionInfo)
+        return 0;
+
+    if (VerQueryValue(versionInfo, L"\\", &rootBlock, &rootBlockLength) && rootBlockLength != 0)
+        revisionNumber = rootBlock->dwFileVersionLS & 0xffff;
+
+    PhFree(versionInfo);
+
+    return revisionNumber;
+}
+
 VOID Patch(
     __in PPH_STRING FileName,
     __in PPATCH_FUNCTION Action
@@ -635,6 +657,127 @@ VOID PatchLoader7601(
     }
 }
 
+VOID PatchLoader7601_23569(
+    __in PLOADED_IMAGE LoadedImage,
+    __out PBOOLEAN Success
+)
+{
+  // ImgpValidateImageHash - patch to always return 0
+/*
+  .text:004295F7 
+  .text:004295FF
+  .text:004295FF                         loc_4295FF : ; CODE XREF : ImgpValidateImageHash(x, x, x, x, x) + 1Dj
+  .text:004295FF; ImgpValidateImageHash(x, x, x, x, x) + A6j ...
+  .text:004295FF 
+*/
+  UCHAR target[] =
+  {
+    // mov[esp + 70h + var_58], 0C0000428h; critical service failed
+    0xC7, 0x44, 0x24, 0x18, 0x28, 0x04, 0x00, 0xC0,
+    // 8B 44 24 18                             mov     eax, [esp + 70h + var_58]
+    0x8B, 0x44, 0x24, 0x18,
+  };
+  ULONG jgeOffset = 8;
+  PUCHAR ptr = LoadedImage->MappedAddress;
+  ULONG i, j;
+
+  *Success = FALSE;
+
+  for (i = 0; i < LoadedImage->SizeOfImage - sizeof(target); i++)
+  {
+    for (j = 0; j < sizeof(target); j++)
+    {
+      if (ptr[j] != target[j])
+        break;
+    }
+
+    if (j == sizeof(target))
+    {
+      // Found it. Patch the code.
+      // Note that we don't need to update var_8 as it is 
+      // a temporary status variable which will be overwritten 
+      // very shortly.
+
+      // mov eax, [esp + 70h + var_58] -> xor eax, eax; nop; nop
+      // 0x7d, 0x2e -> 0xeb, 0x2e
+      memcpy(ptr + jgeOffset, "\x31\xC0\x90\x90", 4);
+
+      *Success = TRUE;
+
+      break;
+    }
+
+    ptr++;
+  }
+}
+
+// Version from https://github.com/Elbandi/PatchPae2, doesn't work for me
+VOID PatchLoader7601_23569_0(
+    __in PLOADED_IMAGE LoadedImage,
+    __out PBOOLEAN Success
+    )
+{
+    // ImgpLoadPEImage
+
+    // There is a function called ImgpValidateImageHash. We are 
+    // going to patch ImgpLoadPEImage so that it doesn't care 
+    // what the result of the function is.
+
+    UCHAR target[] =
+    {
+        // lea eax, [ebp+Source1]
+        0x8d, 0x85, 0x94, 0xfe, 0xff, 0xff,
+        // push eax
+        0x50,
+        // push [ebp+var_28]
+        0xff, 0x75, 0xd8,
+        // mov eax, [ebp+arg_0]
+        0x8b, 0x45, 0x08,
+        // push dword ptr [eax+0Ch]
+        0xff, 0x70, 0x0c,
+        // lea eax, [ebp+var_64]
+        0x8d, 0x45, 0x9c,
+        // call _ImgpValidateImageHash@24
+        // 0xe8, 0x5f, 0x05, 0x00, 0x00
+        // mov [ebp+var_8], eax ; copy return status into var_8
+        // 0x89, 0x45, 0xf8
+        // test eax, eax ; did ImgpValidateImageHash succeed?
+        // 0x85, 0xc0
+        // jge short loc_428eae ; if the function succeeded, go there
+        // 0x7d, 0x2e
+    };
+    ULONG jgeOffset = 29;
+    PUCHAR ptr = LoadedImage->MappedAddress;
+    ULONG i, j;
+
+    for (i = 0; i < LoadedImage->SizeOfImage - sizeof(target); i++)
+    {
+        for (j = 0; j < sizeof(target); j++)
+        {
+            if (ptr[j] != target[j])
+                break;
+        }
+
+        if (j == sizeof(target))
+        {
+            // Found it. Patch the code.
+            // Note that we don't need to update var_8 as it is 
+            // a temporary status variable which will be overwritten 
+            // very shortly.
+
+            // jge short loc_428eae -> jmp short loc_428eae
+            // 0x7d, 0x2e -> 0xeb, 0x2e
+            ptr[jgeOffset] = 0xeb;
+
+            *Success = TRUE;
+
+            break;
+        }
+
+        ptr++;
+    }
+}
+
 VOID PatchLoader9200Part1(
     __in PLOADED_IMAGE LoadedImage,
     __out PBOOLEAN Success
@@ -1124,9 +1267,9 @@ int __cdecl main(int argc, char *argv[])
     };
 
     PH_STRINGREF commandLine;
-    ULONG buildNumber;
+    ULONG buildNumber, revisionNumber;
 
-    if (!NT_SUCCESS(PhInitializePhLibEx(0, 0, 0)))
+    if (!NT_SUCCESS(PhInitializePhLibEx(0, 0, 0, 0)))
         return 1;
 
     PhUnicodeStringToStringRef(&NtCurrentPeb()->ProcessParameters->CommandLine, &commandLine);
@@ -1155,6 +1298,11 @@ int __cdecl main(int argc, char *argv[])
     if (!(buildNumber = GetBuildNumber(ArgOutput->Buffer)))
         Fail(L"Unable to get the build number of the file.", 0);
 
+    if (!(revisionNumber = GetRevisionNumber(ArgOutput->Buffer)))
+        Fail(L"Unable to get the revision number of the file.", 0);
+	
+	wprintf(L"Build %d, Revision %d\n", buildNumber, revisionNumber);
+
     if (ArgTypeInteger == TYPE_KERNEL)
     {
         if (buildNumber < 9200)
@@ -1174,6 +1322,8 @@ int __cdecl main(int argc, char *argv[])
             Patch(ArgOutput, PatchLoader);
         else if (buildNumber == 7600)
             Patch(ArgOutput, PatchLoader7600);
+        else if (buildNumber == 7601 && revisionNumber == 23569)
+            Patch(ArgOutput, PatchLoader7601_23569);
         else if (buildNumber == 7601)
             Patch(ArgOutput, PatchLoader7601);
         else if (buildNumber == 9200)
