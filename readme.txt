@@ -1,5 +1,5 @@
 PatchPae (v2) by wj32.
-Tested on: Windows Vista SP2, Windows 7 SP0, Windows 7 SP1, Windows 8, Windows 8.1, Windows 10 (builds 10240, 10586, 14393)
+Tested on: Windows Vista SP2, Windows 7 SP0, Windows 7 SP1, Windows 8, Windows 8.1, Windows 10 (builds 10240, 10586, 14393, 23569)
 
 == Installation ==
 1.  Open an elevated Command Prompt window.
