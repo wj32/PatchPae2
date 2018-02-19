@@ -694,12 +694,7 @@ VOID PatchLoader7601_23569(
     if (j == sizeof(target))
     {
       // Found it. Patch the code.
-      // Note that we don't need to update var_8 as it is 
-      // a temporary status variable which will be overwritten 
-      // very shortly.
-
       // mov eax, [esp + 70h + var_58] -> xor eax, eax; nop; nop
-      // 0x7d, 0x2e -> 0xeb, 0x2e
       memcpy(ptr + jgeOffset, "\x31\xC0\x90\x90", 4);
 
       *Success = TRUE;
@@ -1322,10 +1317,13 @@ int __cdecl main(int argc, char *argv[])
             Patch(ArgOutput, PatchLoader);
         else if (buildNumber == 7600)
             Patch(ArgOutput, PatchLoader7600);
-        else if (buildNumber == 7601 && revisionNumber == 23569)
-            Patch(ArgOutput, PatchLoader7601_23569);
         else if (buildNumber == 7601)
-            Patch(ArgOutput, PatchLoader7601);
+        {
+            if(revisionNumber >= 23569)
+                Patch(ArgOutput, PatchLoader7601_23569);
+            else
+                Patch(ArgOutput, PatchLoader7601);
+        }
         else if (buildNumber == 9200)
             Patch(ArgOutput, PatchLoader9200);
         else if (buildNumber == 9600)
