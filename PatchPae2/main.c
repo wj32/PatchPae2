@@ -726,7 +726,7 @@ VOID PatchLoader7601_23569_0(
     UCHAR target[] =
     {
         // lea eax, [ebp+Source1]
-        0x8d, 0x85, 0x94, 0xfe, 0xff, 0xff,
+        0x8d, 0x85, 0x84, 0xfe, 0xff, 0xff,
         // push eax
         0x50,
         // push [ebp+var_28]
@@ -1269,7 +1269,7 @@ int __cdecl main(int argc, char *argv[])
     PH_STRINGREF commandLine;
     ULONG buildNumber, revisionNumber;
 
-    if (!NT_SUCCESS(PhInitializePhLibEx(0, 0, 0, 0)))
+    if (!NT_SUCCESS(PhInitializePhLibEx(0, 0, 0)))
         return 1;
 
     PhUnicodeStringToStringRef(&NtCurrentPeb()->ProcessParameters->CommandLine, &commandLine);
@@ -1324,6 +1324,8 @@ int __cdecl main(int argc, char *argv[])
             Patch(ArgOutput, PatchLoader7600);
         else if (buildNumber == 7601 && revisionNumber == 23569)
             Patch(ArgOutput, PatchLoader7601_23569);
+        else if (buildNumber == 7601 && revisionNumber == 24517)
+            Patch(ArgOutput, PatchLoader7601_23569_0);
         else if (buildNumber == 7601)
             Patch(ArgOutput, PatchLoader7601);
         else if (buildNumber == 9200)
